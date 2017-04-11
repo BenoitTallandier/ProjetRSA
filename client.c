@@ -10,31 +10,14 @@
 
 int main(int argc, char const *argv[]){
 
-	void * ecoute(void * arg){
-		int dialogSocket = (int)arg;
-		char messageReception[2052] = "";
-		while(1){
-			recv(dialogSocket,messageReception,2052,0);
-			//if(memcmp(&messageReception,&messageVide,2052)!=0 ){
-				printf("%s",messageReception);
-			//}
-			strcpy(messageReception,"");
-		}
-	}
-
 	printf("start client \n");
 
 	char messageEnvoye[2048];
-	pthread_t * thread;
-	thread = malloc(sizeof(pthread_t));
 
 	struct sockaddr_in client_addr;
 	int dialogSocket;
-	char message[10];
 
-	client_addr.sin_addr.s_addr = inet_addr("137.74.194.232");
-//	client_addr.sin_addr.s_addr = inet_addr("82.216.253.246");
-	//client_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	client_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	client_addr.sin_port = htons(atoi(argv[1])); /* on utilise htons pour le port */
 	client_addr.sin_family = AF_INET;
 
@@ -46,12 +29,9 @@ int main(int argc, char const *argv[]){
 	if(connect(dialogSocket,(struct sockaddr *) &client_addr, sizeof(client_addr)) < 0){
 		perror("erreur connect \n");
 	}
-	pthread_create(&thread,NULL,ecoute,(void*)dialogSocket);
-	while(1){
-		fgets(messageEnvoye, 2048, stdin);
-		//scanf("%s", messageEnvoye);
-		send(dialogSocket,messageEnvoye,strlen(messageEnvoye),0);
-	}
+	char message[] = "GET http://benoittallandier.com/ HTTP/1.1\nHost: benoittallandier.com\nUser-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\nAccept-Language: en-US,en;q=0.5\nAccept-Encoding: gzip, deflate\nConnection: keep-alive\nUpgrade-Insecure-Requests: 1\n";
+	printf("len : %d\n",strlen(message));	
+	send(dialogSocket,message,strlen(message),0);
 	printf("end client \n");
 	return 0;
 }
