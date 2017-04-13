@@ -1,41 +1,32 @@
-// code for a client connecting to a server
-// namely a stream socket to www.example.com on port 80 (http)
-// either IPv4 or IPv6
+/* for inet_ntoa() */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
-int sockfd;  
-struct addrinfo hints, *servinfo, *p;
-int rv;
+#include <netdb.h>
 
-memset(&hints, 0, sizeof hints);
-hints.ai_family = AF_UNSPEC; // use AF_INET6 to force IPv6
-hints.ai_socktype = SOCK_STREAM;
+#include <stdlib.h>
+#include <stdio.h>
 
-if ((rv = getaddrinfo("www.example.com", "http", &hints, &servinfo)) != 0) {
-    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    exit(1);
+int main(int argc, char **argv) {
+ if (argc < 2) {
+   fprintf(stderr,"Usage: %s hostname\n", argv[0]);
+   exit(1);
+ }
+
+ struct hostent *hp = gethostbyname(argv[1]);
+
+ if (hp == NULL) {
+   fprintf(stderr,"gethostbyname() failed\n");
+   exit(1);
+ } else {
+   printf("%s = ", hp->h_name);
+   unsigned int i=0;
+   while ( hp -> h_addr_list[i] != NULL) {
+     printf( "%s ", inet_ntoa( *( struct in_addr*)( hp -> h_addr_list[i])));
+     i++;
+   }
+   printf("\n");
+   exit(0);
+ }
 }
-
-// loop through all the results and connect to the first we can
-for(p = servinfo; p != NULL; p = p->ai_next) {
-    if ((sockfd = socket(p->ai_family, p->ai_socktype,
-            p->ai_protocol)) == -1) {
-        perror("socket");
-        continue;
-    }
-
-    if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-        perror("connect");
-        close(sockfd);
-        continue;
-    }
-
-    break; // if we get here, we must have connected successfully
-}
-
-if (p == NULL) {
-    // looped off the end of the list with no connection
-    fprintf(stderr, "failed to connect\n");
-    exit(2);
-}
-
-freeaddrinfo(servinfo); // all done with this structure

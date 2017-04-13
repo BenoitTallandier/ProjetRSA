@@ -50,51 +50,61 @@ int main(int argc, char const *argv[]){
 	listClient = accept(socketServer, (struct sockaddr *) &cli_addr,(socklen_t *)&clilen);
 	printf("	accept : %d\n",listClient);
 	printf("	Connection client \n");
-	
+
 	//while(1){
 		recv(listClient, buffer , 8384 , 0);
-		char *temp1,*temp2;
-		temp1 = strstr(buffer, "Host:");
-		temp2 = strstr(buffer,"User-Agent:");
-		int size = strlen(temp1)-strlen(temp2)-6-1;
-		char host[1024]= "";
-		char * hostInt;
-		for(int i=0;i<size;i++){
-			host[i] = temp1[6+i];
-		}
-		printf("HOST : (%s) \n",host);
-		printf("%s\n",buffer);
-		struct hostent *hp = gethostbyname(host);
-		 if (hp == NULL) {
-		   fprintf(stderr,"gethostbyname() failed\n");
-		   exit(1);
-		 } else {
-		   printf("%s = ", hp->h_name);
-		   unsigned int i=0;
-		   if( hp -> h_addr_list[0] != NULL) {
-		   		hostInt = inet_ntoa( *( struct in_addr*)( hp -> h_addr_list[0]));
-			 printf( "%s ",hostInt);
-		   }
-		  }
-		struct sockaddr_in client_addr;
-		int dialogSocket;
-		char message[10];
-		client_addr.sin_addr.s_addr = inet_addr(hostInt);
-		client_addr.sin_port = htons(80); // on utilise htons pour le port 
-		client_addr.sin_family = AF_INET;
+		if(strspn(buffer, "GET") >0){
+			printf("request HTTP\n");
+			char * host=malloc(sizeof(char)*100);
+			char *token;
+			token = strtok (buffer,"\n");
+			while (token != NULL)
+		    {
+				printf("%s\n",token);
+				if(strspn(token, "Host: ") >0){
+					sscanf(token,"Host: %s",host);
+				}
+			   	token = strtok (NULL, "\n");
+		    }
+			char * hostInt;
+			printf("HOST : (%s) \n",host);
+			printf("%s\n",buffer);
+			struct hostent *hp = gethostbyname(host);
+			if (hp == NULL) {
+			   fprintf(stderr,"gethostbyname() failed\n");
+			   exit(1);
+			} else {
+			   printf("%s = ", hp->h_name);
+			   unsigned int i=0;
+			   if( hp -> h_addr_list[0] != NULL) {
+			   		hostInt = inet_ntoa( *( struct in_addr*)( hp -> h_addr_list[0]));
+				 printf( "%s ",hostInt);
+			   }
+			  }
+			struct sockaddr_in client_addr;
+			int dialogSocket;
+			char message[10];
+			client_addr.sin_addr.s_addr = inet_addr(hostInt);
+			client_addr.sin_port = htons(80); // on utilise htons pour le port
+			client_addr.sin_family = AF_INET;
 
-		if( (dialogSocket = socket(PF_INET,SOCK_STREAM,0))<0){
-			perror("echec de création socket \n");
-		}
+			if( (dialogSocket = socket(PF_INET,SOCK_STREAM,0))<0){
+				perror("echec de création socket \n");
+			}
 
 
-		if(connect(dialogSocket,(struct sockaddr *) &client_addr, sizeof(client_addr)) < 0){
-			perror("erreur connect \n");
+			if(connect(dialogSocket,(struct sockaddr *) &client_addr, sizeof(client_addr)) < 0){
+				perror("erreur connect \n");
+			}
+			printf("server connected \n");
+			send(dialogSocket,buffer,strlen(buffer),0);
+			recv(dialogSocket,buffer , 8384 , 0);
+			printf("%s\n",buffer);
 		}
-		printf("server connected \n");
-		send(dialogSocket,buffer,strlen(buffer),0);
-		recv(dialogSocket,buffer , 8384 , 0);
-		printf("%s\n",buffer);
+		else{
+			printf("request non HTTP \n%s\n",buffer);
+			printf("%c%c%c",buffer[0],buffer[1],buffer[2]);
+		}
 		//sleep(5);
 	//}
 	printf("end\n");
