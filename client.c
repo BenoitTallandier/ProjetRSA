@@ -29,8 +29,8 @@ int main(int argc, char const *argv[]){
 	if(connect(dialogSocket,(struct sockaddr *) &client_addr, sizeof(client_addr)) < 0){
 		perror("erreur connect \n");
 	}
-	char message[] = "GET http://benoittallandier.com/ HTTP/1.1\nHost: benoittallandier.com\nUser-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\nAccept-Language: en-US,en;q=0.5\nAccept-Encoding: gzip, deflate\nConnection: keep-alive\nUpgrade-Insecure-Requests: 1\n";
-	printf("len : %d\n",strlen(message));	
+	char * message = "GET /index.html HTTP/1.1\r\nHost: benoittallandier.com\r\n\r\n";
+	printf("len : %d\n",strlen(message));
 	send(dialogSocket,message,strlen(message),0);
 	printf("end client \n");
 	return 0;
