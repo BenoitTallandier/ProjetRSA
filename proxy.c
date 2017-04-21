@@ -11,12 +11,61 @@
 #include <netdb.h>
 
 
+struct argThread{
+	int socketServer;
+	int socketClient;
+};
+
+void * ecouteClient(void * arg){
+
+}
+
+void * ecouteServeur(void * arg){
+	printf("		demarage thread\n");
+	struct argThread * argument = (struct argThread *)arg;
+	int socketServer = argument->socketServer;
+	int socketClient = argument->socketClient;
+	char  bufferReception[512];
+	int result = 1;
+	while((result = recv(socketServer,bufferReception, sizeof(bufferReception) , 0))>=0){
+		if(result==0){
+			printf("----END reception ----\n");
+			break;
+		}
+		//printf("--------------reception %d ------------\n %s\n\n",result,bufferReception);
+		send(socketClient,&bufferReception,strlen(bufferReception),0 );
+		memset(bufferReception,0,strlen(bufferReception));
+	}
+	printf("THREAD END\n");
+	return;
+}
+
+
+char * getHost(char * buffer){
+	char * bufferCpy = malloc(8384*sizeof(char));
+	memcpy(bufferCpy,buffer,8384);
+	char * host = malloc(sizeof(char)*100);
+	char *token;
+	token = strtok (bufferCpy,"\n");
+	while (token != NULL)
+	{
+		if(strspn(token, "Host: ") >0){
+			sscanf(token,"Host: %s:",host);
+		}
+		token = strtok (NULL, "\n");
+	}
+	printf("HOST : (%s) \n",host);
+	return host;
+}
+
 int main(int argc, char const *argv[]){
 	printf("start\n");
 
-	int i;
 	pthread_t * threads;
-	threads = malloc(1*sizeof(pthread_t));
+	threads = malloc(10*sizeof(pthread_t));
+	struct argThread *arguments;
+	arguments = malloc(10*sizeof(struct argThread));
+
 
 	struct addrinfo hints, *res;
 	struct sockaddr_in serv_addr, cli_addr;
@@ -26,7 +75,9 @@ int main(int argc, char const *argv[]){
 	memset(&serv_addr, 0, sizeof(serv_addr));
 	char * buffer=malloc(8384*sizeof(char));
 	char * bufferCpy = malloc(8384*sizeof(char));//"GET /index.html HTTP/1.1\r\nHost: www.benoittallandier.com\r\n\r\n";
-	char  bufferReception[1048576] = "a";
+	char * messageVide = malloc(8384*sizeof(char));
+	memset(messageVide,0,strlen(messageVide));
+	int i;
 
 	clilen = sizeof(cli_addr);
 	/* configuration de serv_addr */
@@ -49,58 +100,58 @@ int main(int argc, char const *argv[]){
 	if(listen(socketServer, 1)<0){
 		perror("echec\n");
 	}
+	while(1){
+		printf("Attente d'un client\n");
+		listClient = accept(socketServer, (struct sockaddr *) &cli_addr,(socklen_t *)&clilen);
+		printf("	accept : %d\n",listClient);
+		printf("	Connection client \n");
+		int dialogSocket;
+		i = 0;
+		int size;
+			printf("------------debut recv-------------\n");
+			size = recv(listClient, buffer , 8384 , 0);
+			printf("-----------fin recv %d-----------\n",size );
+			/*if(size<=0 || memcmp(buffer,&messageVide,8384)==0){
+				printf("fin d'ecoute client\n");
+				break;
+			}*/
+			printf("client : %s\n",buffer);
+							//recv(listClient, buffer , 8384 , 0);
+				if(strspn(buffer, "GET") >0 || strspn(buffer, "CONNECT") >0){
+					char * host = getHost(buffer);
+					memset(&hints, 0,sizeof hints);
+				    hints.ai_family=AF_INET;
+				    getaddrinfo(host,"80", &hints, &res);
+					struct sockaddr_in client_addr;
+					char message[10];
+					//client_addr.sin_addr.s_addr = hostInt;
+					if( (dialogSocket = socket(PF_INET,SOCK_STREAM,0))<0){
+						perror("echec de création socket \n");
+					}
+					printf("socket created\n");
 
-	listClient = accept(socketServer, (struct sockaddr *) &cli_addr,(socklen_t *)&clilen);
-	printf("	accept : %d\n",listClient);
-	printf("	Connection client \n");
+					if(connect(dialogSocket,res->ai_addr,res->ai_addrlen) < 0){
+						perror("erreur connect \n");
+					}
+					arguments[i].socketClient = listClient;
+					arguments[i].socketServer = dialogSocket;
+					printf("server connected \n");
 
-	//while(1){
-		recv(listClient, buffer , 8384 , 0);
-		while(strspn(buffer, "GET") <0){
-			recv(listClient, buffer , 8384 , 0);
-		}
-		memcpy(bufferCpy,buffer,8384);
-		if(strspn(buffer, "GET") >0){
-			printf("request HTTP\n");
-			char * host=malloc(sizeof(char)*100);
-			char *token;
-			token = strtok (buffer,"\n");
-			while (token != NULL)
-		    {
-				//printf("%s\n",token);
-				if(strspn(token, "Host: ") >0){
-					sscanf(token,"Host: %s",host);
+					pthread_create(&threads[i],NULL,ecouteServeur,&arguments[i]);
+
+					printf("-------------\nenvoi de \n%s\n------------------\n",buffer);
+					send(dialogSocket,buffer,strlen(buffer),0);
+
 				}
-			   	token = strtok (NULL, "\n");
-		    }
-			printf("HOST : (%s) \n",host);
-			memset(&hints, 0,sizeof hints);
-		    hints.ai_family=AF_INET;
-		    getaddrinfo(host,"80", &hints, &res);
-			struct sockaddr_in client_addr;
-			int dialogSocket;
-			char message[10];
-			//client_addr.sin_addr.s_addr = hostInt;
-			if( (dialogSocket = socket(PF_INET,SOCK_STREAM,0))<0){
-				perror("echec de création socket \n");
-			}
-			printf("socket created\n");
+				else{
+					printf("request non HTTP \n%s\n",buffer);
+					printf("-------------\nenvoi de \n%s\n------------------\n",buffer);
+					send(dialogSocket,buffer,strlen(buffer),0);
+				}
+				memset(buffer,0,strlen(buffer));
 
-			if(connect(dialogSocket,res->ai_addr,res->ai_addrlen) < 0){
-				perror("erreur connect \n");
-			}
-			printf("server connected \n");
-			printf("-------------\nenvoi de \n%s\n------------------\n",bufferCpy);
-			send(dialogSocket,bufferCpy,strlen(bufferCpy),0);
-			recv(dialogSocket,bufferReception, 1048576 , 0);
-			printf("reception : %s\n",bufferReception);
-		}
-		else{
-			printf("request non HTTP \n%s\n",buffer);
-			printf("%s\n",buffer);
-		}
-		//sleep(5);
-	//}
+			//sleep(5);
+	}
 	printf("end\n");
 	return 0;
 }

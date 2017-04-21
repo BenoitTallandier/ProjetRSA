@@ -13,7 +13,7 @@ int main(int argc, char const *argv[]){
 	printf("start client \n");
 
 	char messageEnvoye[2048];
-
+	char  bufferReception[512*sizeof(char)] = "";
 	struct sockaddr_in client_addr;
 	int dialogSocket;
 
@@ -32,6 +32,15 @@ int main(int argc, char const *argv[]){
 	char * message = "GET /index.html HTTP/1.1\r\nHost: benoittallandier.com\r\n\r\n";
 	printf("len : %d\n",strlen(message));
 	send(dialogSocket,message,strlen(message),0);
+	int result;
+	while((result = recv(dialogSocket,bufferReception, sizeof(bufferReception) , 0))>=0){
+		if(result==0){
+			printf("#### END reception ####\n");
+			break;
+		}
+		printf("############reception %d ##########\n %s\n\n",result,bufferReception);
+		memset(bufferReception,0,strlen(bufferReception));
+	}
 	printf("end client \n");
 	return 0;
 }
