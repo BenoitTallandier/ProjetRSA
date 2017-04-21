@@ -42,15 +42,29 @@ void * ecouteServeur(void * arg){
 
 
 char * getHost(char * buffer){
+	int x=0;
+	if(strspn(buffer, "GET") >0){
+		x=1;
+		printf("request GET\n");
+	}
+	if(strspn(buffer, "CONNECT")>0){
+		x=2;
+		printf("request CONNECT\n");
+	}
 	char * bufferCpy = malloc(8384*sizeof(char));
 	memcpy(bufferCpy,buffer,8384);
 	char * host = malloc(sizeof(char)*100);
 	char *token;
+	int port;
 	token = strtok (bufferCpy,"\n");
 	while (token != NULL)
 	{
-		if(strspn(token, "Host: ") >0){
+		if(x==1 && strspn(token, "Host: ") >0){
+			sscanf(token,"Host: %s",host);
+		}
+		else if(x==2 && strspn(token, "Host: ") >0){
 			sscanf(token,"Host: %s:",host);
+			printf(" host connect : %s\n",host);
 		}
 		token = strtok (NULL, "\n");
 	}
