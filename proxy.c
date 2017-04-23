@@ -9,6 +9,8 @@
 #include <pthread.h>
 #include <math.h>
 #include <netdb.h>
+#include <unistd.h>
+#define TAILLE_MAX 30000
 
 //gzip, deflate
 
@@ -18,17 +20,45 @@ struct argThread{
 	int socketClient;
 };
 
+struct argThreadServ{
+	char ** pub;
+	int socketClient;
+};
+
+char** LectureFile() {
+
+	char ligne[TAILLE_MAX] = "";
+	int lenStr;
+	FILE * listfile = fopen("easylist.txt", "r");
+	int i = 0;
+	while (fgets(ligne, TAILLE_MAX, listfile) != NULL) {
+		i++;
+	}
+	rewind(listfile);
+
+	char** listsite = (char**)malloc(i*TAILLE_MAX + 1);
+	int g = 0;
+	while (fgets(ligne, TAILLE_MAX, listfile) != NULL) {
+		listsite[g] = malloc(strlen(ligne)+2);
+		lenStr = strlen(ligne);
+		ligne[(lenStr - 1)] = '\0';
+		strcpy(listsite[g], ligne);
+		g++;
+	}
+	return listsite;
+}
+
 
 void * ecouteServeur(void * arg){
 	//printf("		demarage thread\n");
 	struct argThread * argument = (struct argThread *)arg;
 	int socketServer = argument->socketServer;
 	int socketClient = argument->socketClient;
-	char  bufferReception[512];
+	char  bufferReception[1452];
 	int result = 1;
 	while((result = recv(socketServer,bufferReception, sizeof(bufferReception) , 0))>=0){
-		//printf("--------------reception %d ------------\n \n\n",result);//bufferReception);
-
+		//printf("--------------reception %d ------------\n %s\n\n",result,bufferReception);
+		//printf("	reception %d\n",result);
 		send(socketClient,&bufferReception,strlen(bufferReception),0 );
 		memset(bufferReception,0,strlen(bufferReception));
 		if(result==0){
@@ -49,11 +79,10 @@ char * getHost(char * buffer){
 	if(strspn(buffer, "CONNECT")>0){
 		x=2;
 	}
-	char * bufferCpy = malloc(8384*sizeof(char));
-	memcpy(bufferCpy,buffer,8384);
+	char * bufferCpy = malloc(1452*sizeof(char));
+	memcpy(bufferCpy,buffer,1452);
 	char * host = malloc(sizeof(char)*100);
 	char *token;
-	int port;
 	token = strtok (bufferCpy,"\n");
 	while (token != NULL)
 	{
@@ -72,49 +101,51 @@ char * getHost(char * buffer){
 
 void * ecouteClient(void * arg){
 	//printf("Demarage thread client\n");
-	char pub[][20] = {
+	/*char pub[][20] = {
      	"adleadevent.com",
      	"amazon-adsystem.com",
      	"adnxs.com",
-		"bfmtv.com"
-	};
-
-
-
-	int listClient = *((int *)arg);
+		"smartadserver.com",
+		"dtech.de"
+	};*/
+	char * response = "HTTP/1.1 202 Ok\r\n\r\n";
+	struct argThreadServ ar= *((struct argThreadServ *)arg);
+	int listClient = ar.socketClient;
+	char ** pub = ar.pub;
 	struct addrinfo hints, *res;
 	pthread_t * threads;
 	threads = malloc(10*sizeof(pthread_t));
 	struct argThread *arguments;
 	arguments = malloc(10*sizeof(struct argThread));
-	char * buffer=malloc(8384*sizeof(char));
-	char * bufferCpy = malloc(8384*sizeof(char));//"GET /index.html HTTP/1.1\r\nHost: www.benoittallandier.com\r\n\r\n";
-	char * messageVide = malloc(8384*sizeof(char));
+	char * buffer=malloc(18000*sizeof(char));//"GET /index.html HTTP/1.1\r\nHost: www.benoittallandier.com\r\n\r\n";
+	char * messageVide = malloc(18000*sizeof(char));
 	memset(messageVide,0,strlen(messageVide));
-	int i;
+	int i,j;
 
 	int dialogSocket;
 	i = 0;
-	int size;
 	int nonPub =1;
-	size = recv(listClient, buffer , 8384 , 0);
-	/*if(size<=0 || memcmp(buffer,&messageVide,8384)==0){
+	recv(listClient, buffer , 18000 , 0);
+	if(strlen(buffer)==0	){
+		pthread_exit(NULL);
+	}
+	//printf("------------------\n%s\n-------------------------\n",buffer);
+	/*if(size<=0 || memcmp(buffer,&messageVide,1452)==0){
 		printf("fin d'ecoute client\n");
 		break;
 	}*/
 	//printf("client : %s\n",buffer);
-				//recv(listClient, buffer , 8384 , 0);
+				//recv(listClient, buffer , 1452 , 0);
 	if(strspn(buffer, "GET") >0 ){//|| strspn(buffer, "CONNECT") >0){
 		char * host = getHost(buffer);
-		for(int i=0;i<4;i++){
-			//printf("%s : %d\n",pub[i],sizeof(pub[i]));
-
-			if(strstr(host, pub[i])!=NULL){
-				printf("%s bloqué par %s\n",host,pub[i]);
+		for(j=0;j<61245;j++){
+			if(strstr(host, pub[j])!=NULL){
+				printf("%s bloqué par %s\n",host,pub[j]);
 				nonPub = 0;
 			}
 		}
 		if(nonPub==0){
+			send(listClient, response,strlen(response),0);
 			//printf("pub bloqué : %s\n",host);
 		}
 		if(nonPub==1){
@@ -122,8 +153,6 @@ void * ecouteClient(void * arg){
 			memset(&hints, 0,sizeof hints);
 		    hints.ai_family=AF_INET;
 		    getaddrinfo(host,"80", &hints, &res);
-			struct sockaddr_in client_addr;
-			char message[10];
 			//client_addr.sin_addr.s_addr = hostInt;
 			if( (dialogSocket = socket(PF_INET,SOCK_STREAM,0))<0){
 				perror("echec de création socket \n");
@@ -135,7 +164,6 @@ void * ecouteClient(void * arg){
 			}
 			arguments[i].socketClient = listClient;
 			arguments[i].socketServer = dialogSocket;
-			//printf("server connected \n");
 
 			pthread_create(&threads[i],NULL,ecouteServeur,&arguments[i]);
 
@@ -149,10 +177,10 @@ void * ecouteClient(void * arg){
 	else{
 		//printf("request non HTTP \n%s\n",buffer);
 		//printf("-------------\nenvoi de \n%s\n------------------\n",buffer);
-		//send(dialogSocket,buffer,strlen(buffer),0);
+		send(listClient,response,strlen(response),0);
 	}
-	close(listClient);
 	memset(buffer,0,strlen(buffer));
+	close(listClient);
 	pthread_exit(NULL);
 }
 
@@ -163,18 +191,16 @@ int main(int argc, char const *argv[]){
 	printf("start\n");
 
 
-
+	char ** pub = LectureFile();
 	pthread_t * threads;
 	threads = malloc(1000*sizeof(pthread_t));
-
+	struct argThreadServ * arg = malloc(1000*sizeof(struct argThreadServ));
 	struct sockaddr_in serv_addr, cli_addr;
 	int socketServer,clilen;
 	int * listClient;
 	listClient = malloc(1*sizeof(int));
 	memset(&serv_addr, 0, sizeof(serv_addr));
 	int i;
-	int *arguments;
-	arguments = malloc(1000*sizeof(int));
 	clilen = sizeof(cli_addr);
 	/* configuration de serv_addr */
 	serv_addr.sin_family = 	AF_INET;
@@ -196,13 +222,14 @@ int main(int argc, char const *argv[]){
 		perror("echec\n");
 	}
 	i=0;
-	while(1){
+	for(;;){
 		//printf("Attente d'un client\n");
 		*listClient = accept(socketServer, (struct sockaddr *) &cli_addr,(socklen_t *)&clilen);
 		//printf("	accept : %d\n",*listClient);
-		arguments[i] = *listClient;
+		arg[i].socketClient = *listClient;
+		arg[i].pub = pub;
 		//printf("demarage de %d\n",i);
-		pthread_create(&threads[i],NULL,ecouteClient,&arguments[i]);
+		pthread_create(&threads[i],NULL,ecouteClient,&arg[i]);
 		i = i+1;
 		//pthread_join(threads[i],NULL);
 		if(i>=1000){
