@@ -29,11 +29,12 @@ char** LectureFile() {
 
 	char ligne[TAILLE_MAX] = "";
 	int lenStr;
-	FILE * listfile = fopen("easylist.txt", "r");
+	FILE * listfile = fopen("adservers.txt", "r");
 	int i = 0;
 	while (fgets(ligne, TAILLE_MAX, listfile) != NULL) {
 		i++;
 	}
+	printf(" --- i = %d\n",i);
 	rewind(listfile);
 
 	char** listsite = (char**)malloc(i*TAILLE_MAX + 1);
@@ -60,11 +61,11 @@ void * ecouteServeur(void * arg){
 		//printf("--------------reception %d ------------\n %s\n\n",result,bufferReception);
 		//printf("	reception %d\n",result);
 		send(socketClient,&bufferReception,strlen(bufferReception),0 );
-		memset(bufferReception,0,strlen(bufferReception));
-		if(result==0){
+		if(strstr(bufferReception,"\r\n\r\n")!=NULL){
 			//printf("----END reception ----\n");
 			break;
 		}
+		memset(bufferReception,0,strlen(bufferReception));
 	}
 	//printf("THREAD END\n");
 	pthread_exit(NULL);
@@ -108,7 +109,7 @@ void * ecouteClient(void * arg){
 		"smartadserver.com",
 		"dtech.de"
 	};*/
-	char * response = "HTTP/1.1 202 Ok\r\n\r\n";
+	char * response = "HTTP/1.1 202 Ok\r\nContent-Type: text/html\r\nContent-Length: 43\r\n<div style='color:red;'>pub bloquee</div>\r\n\r\n";
 	struct argThreadServ ar= *((struct argThreadServ *)arg);
 	int listClient = ar.socketClient;
 	char ** pub = ar.pub;
@@ -126,7 +127,7 @@ void * ecouteClient(void * arg){
 	i = 0;
 	int nonPub =1;
 	recv(listClient, buffer , 18000 , 0);
-	if(strlen(buffer)==0	){
+	if(strlen(buffer)==0){
 		pthread_exit(NULL);
 	}
 	//printf("------------------\n%s\n-------------------------\n",buffer);
@@ -138,10 +139,16 @@ void * ecouteClient(void * arg){
 				//recv(listClient, buffer , 1452 , 0);
 	if(strspn(buffer, "GET") >0 ){//|| strspn(buffer, "CONNECT") >0){
 		char * host = getHost(buffer);
-		for(j=0;j<61245;j++){
-			if(strstr(host, pub[j])!=NULL){
-				printf("%s bloqué par %s\n",host,pub[j]);
-				nonPub = 0;
+		char * result;
+		char token[80];
+
+		for(j=0;j<46584;j++){
+			if(strlen(pub[j])>0 && (result=strstr(host, pub[j]))!=NULL){
+				sprintf(token,".%s",result);
+				if(strlen(host) == strlen(pub[j]) || strstr(host,token)!=NULL){
+					printf("%s bloqué par %s\n",host,pub[j]);
+					nonPub = 0;
+				}
 			}
 		}
 		if(nonPub==0){
@@ -189,8 +196,6 @@ void * ecouteClient(void * arg){
 
 int main(int argc, char const *argv[]){
 	printf("start\n");
-
-
 	char ** pub = LectureFile();
 	pthread_t * threads;
 	threads = malloc(1000*sizeof(pthread_t));
