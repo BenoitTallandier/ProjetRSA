@@ -55,7 +55,8 @@ void * ecouteServeur(void * arg){
 	struct argThread * argument = (struct argThread *)arg;
 	int socketServer = argument->socketServer;
 	int socketClient = argument->socketClient;
-	char  bufferReception[1452];
+	int taille = 5808;
+	char  bufferReception[taille];
 	int result = 1;
 	while((result = recv(socketServer,bufferReception, sizeof(bufferReception) , 0))>=0){
 		//printf("--------------reception %d ------------\n %s\n\n",result,bufferReception);
@@ -109,7 +110,7 @@ void * ecouteClient(void * arg){
 		"smartadserver.com",
 		"dtech.de"
 	};*/
-	char * response = "HTTP/1.1 202 Ok\r\nContent-Type: text/html\r\nContent-Length: 43\r\n<div style='color:red;'>pub bloquee</div>\r\n\r\n";
+	char * response = "HTTP/1.1 202 Ok\r\n\r\n";
 	struct argThreadServ ar= *((struct argThreadServ *)arg);
 	int listClient = ar.socketClient;
 	char ** pub = ar.pub;
@@ -126,7 +127,8 @@ void * ecouteClient(void * arg){
 	int dialogSocket;
 	i = 0;
 	int nonPub =1;
-	recv(listClient, buffer , 18000 , 0);
+	int x = recv(listClient, buffer , 18000 , 0);
+	if(x>=18000){printf("erreur\n");}
 	if(strlen(buffer)==0){
 		pthread_exit(NULL);
 	}
