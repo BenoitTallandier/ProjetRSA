@@ -55,20 +55,34 @@ void * ecouteServeur(void * arg){
 	struct argThread * argument = (struct argThread *)arg;
 	int socketServer = argument->socketServer;
 	int socketClient = argument->socketClient;
-	int taille = 5808;
+	int taille = 45808;
 	char  bufferReception[taille];
 	int result = 1;
-	while((result = recv(socketServer,bufferReception, sizeof(bufferReception) , 0))>=0){
-		printf("--------------reception %d ------------\n %s\n\n",result,bufferReception);
-		//printf("	reception %d\n",result);
+	int size = -1;
+	int length = -1;
+	while((result = recv(socketServer,bufferReception, sizeof(bufferReception) , 0))!=0){ //&& (size<0 || length<size)){
+
+		char * sze=strstr(bufferReception,"Content-Length");
+		if(sze){
+			sze = strtok(sze,"\n");
+			sze = strtok(sze,": ");
+			sze = strtok(NULL,": ");
+			size = atoi(sze); //pour la taille de l'entête
+			printf("size : (%d)\n",size );
+		}
+		//printf("--------------reception %d ------------\n\n",result);
+		printf("	reception %d\n",result);
+		bufferReception[result] = '\0';
 		send(socketClient,&bufferReception,strlen(bufferReception),0 );
-		if(strstr(bufferReception,"\r\n\r\n")!=NULL){
+		/*if(strstr(bufferReception,"\r\n\r\n")!=NULL){
 			//printf("----END reception ----\n");
 			break;
-		}
+		}*/
+		length = length + result;
 		memset(bufferReception,0,strlen(bufferReception));
 	}
-	//printf("THREAD END\n");
+
+	printf("THREAD END\n");
 	pthread_exit(NULL);
 }
 
@@ -139,12 +153,17 @@ void * ecouteClient(void * arg){
 	}*/
 	//printf("client : %s\n",buffer);
 				//recv(listClient, buffer , 1452 , 0);
-	if(strspn(buffer, "GET") >0 ){//|| strspn(buffer, "CONNECT") >0){
+	if(strspn(buffer, "GET") >0 || strspn(buffer, "CONNECT") >0){
 		char * host = getHost(buffer);
+		if(strlen(host)==0){
+			printf("host vide\n");
+			close(listClient);
+			pthread_exit(NULL);
+		}
 		char * result;
 		char token[80];
 
-		for(j=0;j<46584;j++){
+		for(j=0;j<46585;j++){
 			if(strlen(pub[j])>0 && (result=strstr(host, pub[j]))!=NULL){
 				sprintf(token,".%s",result);
 				if(strlen(host) == strlen(pub[j]) || strstr(host,token)!=NULL){
@@ -200,8 +219,8 @@ int main(int argc, char const *argv[]){
 	printf("start\n");
 	char ** pub = LectureFile();
 	pthread_t * threads;
-	threads = malloc(1000*sizeof(pthread_t));
-	struct argThreadServ * arg = malloc(1000*sizeof(struct argThreadServ));
+	threads = malloc(100*sizeof(pthread_t));
+	struct argThreadServ * arg = malloc(100*sizeof(struct argThreadServ));
 	struct sockaddr_in serv_addr, cli_addr;
 	int socketServer,clilen;
 	int * listClient;
@@ -239,7 +258,7 @@ int main(int argc, char const *argv[]){
 		pthread_create(&threads[i],NULL,ecouteClient,&arg[i]);
 		i = i+1;
 		//pthread_join(threads[i],NULL);
-		if(i>=1000){
+		if(i>=100){
 			printf("limite atteinte\n");
 			i=0;
 			//sleep(5);
