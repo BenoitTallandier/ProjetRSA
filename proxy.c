@@ -59,7 +59,7 @@ void * ecouteServeur(void * arg){
 	char  bufferReception[taille];
 	int result = 1;
 	while((result = recv(socketServer,bufferReception, sizeof(bufferReception) , 0))>=0){
-		//printf("--------------reception %d ------------\n %s\n\n",result,bufferReception);
+		printf("--------------reception %d ------------\n %s\n\n",result,bufferReception);
 		//printf("	reception %d\n",result);
 		send(socketClient,&bufferReception,strlen(bufferReception),0 );
 		if(strstr(bufferReception,"\r\n\r\n")!=NULL){
