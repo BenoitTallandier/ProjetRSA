@@ -60,7 +60,12 @@ void * ecouteServeur(void * arg){
 	int result = 1;
 	int size = -1;
 	int length = -1;
-	while((result = recv(socketServer,bufferReception, sizeof(bufferReception) , 0))!=0){ //&& (size<0 || length<size)){
+	struct timeval tv;
+	tv.tv_sec = 10;  /* 30 Secs Timeout */
+	tv.tv_usec = 0;  // Not init'ing this can cause strange errors
+	setsockopt(socketServer, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
+
+	while((result = recv(socketServer,bufferReception, sizeof(bufferReception) , 0))>0){ //&& (size<0 || length<size)){
 
 		char * sze=strstr(bufferReception,"Content-Length");
 		if(sze){
@@ -146,14 +151,14 @@ void * ecouteClient(void * arg){
 	if(strlen(buffer)==0){
 		pthread_exit(NULL);
 	}
-	//printf("------------------\n%s\n-------------------------\n",buffer);
+	printf("------------------\n%s\n-------------------------\n",buffer);
 	/*if(size<=0 || memcmp(buffer,&messageVide,1452)==0){
 		printf("fin d'ecoute client\n");
 		break;
 	}*/
 	//printf("client : %s\n",buffer);
 				//recv(listClient, buffer , 1452 , 0);
-	if(strspn(buffer, "GET") >0 || strspn(buffer, "CONNECT") >0){
+	if(strspn(buffer, "GET") >0){ //|| strspn(buffer, "CONNECT") >0){
 		char * host = getHost(buffer);
 		if(strlen(host)==0){
 			printf("host vide\n");
