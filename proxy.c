@@ -55,29 +55,30 @@ void * ecouteServeur(void * arg){
 	struct argThread * argument = (struct argThread *)arg;
 	int socketServer = argument->socketServer;
 	int socketClient = argument->socketClient;
-	int taille = 45808;
-	char  bufferReception[taille];
+	int tailleBuff = 48080;
+	char  bufferReception[tailleBuff];
+	char  bufferReceptionCpy[tailleBuff];
 	int result = 1;
 	int size = -1;
 	int length = -1;
 	struct timeval tv;
-	tv.tv_sec = 10;  /* 30 Secs Timeout */
+	tv.tv_sec = 10;  /* 10 Secs Timeout */
 	tv.tv_usec = 0;  // Not init'ing this can cause strange errors
 	setsockopt(socketServer, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
 
-	while((result = recv(socketServer,bufferReception, sizeof(bufferReception) , 0))>0){ //&& (size<0 || length<size)){
-
-		char * sze=strstr(bufferReception,"Content-Length");
+	while((result = recv(socketServer,bufferReception, sizeof(bufferReception) , 0))>0){// && (size<0 || length<size)){
+		/*if(result<tailleBuff){bufferReception[result]='\0';}
+		memcpy(bufferReceptionCpy,bufferReception,strlen(bufferReception));
+		char * sze=strstr(bufferReceptionCpy,"Content-Length");
 		if(sze){
 			sze = strtok(sze,"\n");
 			sze = strtok(sze,": ");
 			sze = strtok(NULL,": ");
 			size = atoi(sze); //pour la taille de l'entête
 			printf("size : (%d)\n",size );
-		}
-		//printf("--------------reception %d ------------\n\n",result);
-		printf("	reception %d\n",result);
-		bufferReception[result] = '\0';
+		}*/
+		//printf("--------------reception %d ------------\n%s \n\n",result,bufferReception);
+		//printf("	reception %d\n",result);
 		send(socketClient,&bufferReception,strlen(bufferReception),0 );
 		/*if(strstr(bufferReception,"\r\n\r\n")!=NULL){
 			//printf("----END reception ----\n");
@@ -87,7 +88,7 @@ void * ecouteServeur(void * arg){
 		memset(bufferReception,0,strlen(bufferReception));
 	}
 
-	printf("THREAD END\n");
+	//printf("THREAD END\n");
 	pthread_exit(NULL);
 }
 
@@ -135,32 +136,32 @@ void * ecouteClient(void * arg){
 	char ** pub = ar.pub;
 	struct addrinfo hints, *res;
 	pthread_t * threads;
-	threads = malloc(10*sizeof(pthread_t));
+	threads = malloc(sizeof(pthread_t));
 	struct argThread *arguments;
-	arguments = malloc(10*sizeof(struct argThread));
+	arguments = malloc(sizeof(struct argThread));
 	char * buffer=malloc(18000*sizeof(char));//"GET /index.html HTTP/1.1\r\nHost: www.benoittallandier.com\r\n\r\n";
-	char * messageVide = malloc(18000*sizeof(char));
-	memset(messageVide,0,strlen(messageVide));
-	int i,j;
+	//char * messageVide = malloc(18000*sizeof(char));
+	//memset(messageVide,0,strlen(messageVide));
+	int j;
 
 	int dialogSocket;
-	i = 0;
 	int nonPub =1;
 	int x = recv(listClient, buffer , 18000 , 0);
 	if(x>=18000){printf("erreur\n");}
 	if(strlen(buffer)==0){
 		pthread_exit(NULL);
 	}
-	printf("------------------\n%s\n-------------------------\n",buffer);
+	//printf("------------------\n%s\n-------------------------\n",buffer);
 	/*if(size<=0 || memcmp(buffer,&messageVide,1452)==0){
 		printf("fin d'ecoute client\n");
 		break;
 	}*/
 	//printf("client : %s\n",buffer);
 				//recv(listClient, buffer , 1452 , 0);
-	if(strspn(buffer, "GET") >0){ //|| strspn(buffer, "CONNECT") >0){
+	if(strspn(buffer, "GET") >0){
 		char * host = getHost(buffer);
 		if(strlen(host)==0){
+			free(buffer);
 			printf("host vide\n");
 			close(listClient);
 			pthread_exit(NULL);
@@ -195,14 +196,15 @@ void * ecouteClient(void * arg){
 			if(connect(dialogSocket,res->ai_addr,res->ai_addrlen) < 0){
 				perror("erreur connect \n");
 			}
-			arguments[i].socketClient = listClient;
-			arguments[i].socketServer = dialogSocket;
+			arguments[0].socketClient = listClient;
+			arguments[0].socketServer = dialogSocket;
 
-			pthread_create(&threads[i],NULL,ecouteServeur,&arguments[i]);
+			pthread_create(&threads[0],NULL,ecouteServeur,&arguments[0]);
 
 			//printf("-------------\nenvoi de \n%s\n------------------\n",buffer);
 			send(dialogSocket,buffer,strlen(buffer),0);
-			pthread_join(threads[i],NULL);
+			pthread_join(threads[0],NULL);
+			free(buffer);
 			//printf("retour au thread\n\n");
 			close(dialogSocket);
 		}
@@ -221,17 +223,19 @@ void * ecouteClient(void * arg){
 
 
 int main(int argc, char const *argv[]){
-	printf("start\n");
+	printf("start %d\n",SOMAXCONN);
+	int nbThreads = SOMAXCONN/2-10;
 	char ** pub = LectureFile();
 	pthread_t * threads;
-	threads = malloc(100*sizeof(pthread_t));
-	struct argThreadServ * arg = malloc(100*sizeof(struct argThreadServ));
+	threads = malloc(nbThreads*sizeof(pthread_t));
+	struct argThreadServ * arg = malloc(nbThreads*sizeof(struct argThreadServ));
 	struct sockaddr_in serv_addr, cli_addr;
 	int socketServer,clilen;
 	int * listClient;
 	listClient = malloc(1*sizeof(int));
 	memset(&serv_addr, 0, sizeof(serv_addr));
 	int i;
+	int flagPremiereBoucle=1;
 	clilen = sizeof(cli_addr);
 	/* configuration de serv_addr */
 	serv_addr.sin_family = 	AF_INET;
@@ -256,16 +260,21 @@ int main(int argc, char const *argv[]){
 	for(;;){
 		//printf("Attente d'un client\n");
 		*listClient = accept(socketServer, (struct sockaddr *) &cli_addr,(socklen_t *)&clilen);
+		if(flagPremiereBoucle==0){
+			pthread_join(threads[i],NULL);
+			printf("on attend la fin du thread %d\n",i);
+		}
 		//printf("	accept : %d\n",*listClient);
 		arg[i].socketClient = *listClient;
 		arg[i].pub = pub;
-		//printf("demarage de %d\n",i);
+		printf("demarage de %d\n",i);
 		pthread_create(&threads[i],NULL,ecouteClient,&arg[i]);
 		i = i+1;
 		//pthread_join(threads[i],NULL);
-		if(i>=100){
-			printf("limite atteinte\n");
+		if(i>=nbThreads){
+			printf("l imite atteinte\n");
 			i=0;
+			flagPremiereBoucle = 0;
 			//sleep(5);
 		}
 	}
